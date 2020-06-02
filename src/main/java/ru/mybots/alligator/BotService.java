@@ -33,7 +33,11 @@ public class BotService {
 
     private static final Logger log = LoggerFactory.getLogger(BotService.class);
 
+    private final String addlink = "https://t.me/alligator_vata_bot?startgroup=fromprivate";
+
     private final String COMMAND_STARTGAME = "startgame";
+    private final String COMMAND_STARTGAME_FROM_GROUP = "startgame@alligator_vata_bot";
+    private final String COMMAND_START = "start";
 
     private final String ILQ_SHOWWORD = "showword";
     private final String ILQ_CHANGEWORD = "changeword";
@@ -50,7 +54,7 @@ public class BotService {
 
         final TelegramBot bot = new TelegramBot.Builder("1169475233:AAFmCL-3TRZvT2D3XzvkfzUeKMzVl6gcn-Q").okHttpClient(builder.build()).build();
 
-        ;
+
 
         // Register for updates
         bot.setUpdatesListener(new UpdatesListener() {
@@ -62,30 +66,30 @@ public class BotService {
                 }
 
                 for (Update update : updates) {
-                    Message m = update.message();
                     CallbackQuery cbq = update.callbackQuery();
-
-                    if (m == null) {
-                        continue;
-                    }
+                    boolean isCbq = cbq != null;
+                    Message m = isCbq ? cbq.message() : update.message();
 
                     SendMessage request = null;
 
-                    // Chat has no current game so process only commands
+
+                    // Accept only text and inline queries
+                    if (m == null && !isCbq) {
+                        continue;
+                    }
+                    // Accept commands only from chats without current games
                     if(!gameProcessor.chatSet().contains(m.chat().id())) {
-                        if (!m.text().startsWith("/") && cbq == null) {
+                        if (!isCbq && (m.text() == null || !m.text().startsWith("/"))) {
                             continue;
                         }
                     }
 
-                    try {
-                        if (cbq != null) {
-                            AnswerCallbackQuery answer = processInlineQuery(cbq);
+                    if (isCbq) {
+                        AnswerCallbackQuery answer = processInlineQuery(cbq);
+                        if(answer != null) {
                             bot.execute(answer);
-                            return UpdatesListener.CONFIRMED_UPDATES_ALL;
                         }
-                    } catch (AlligatorApplicationException ex) {
-                        log.error(ex.getError().errmsg());
+                        continue;
                     }
 
                     if (m.text().startsWith("/")) {
@@ -95,7 +99,6 @@ public class BotService {
                     }
 
                     if (request != null) {
-                        // async
                         bot.execute(request, new Callback<SendMessage, SendResponse>() {
                             @Override
                             public void onResponse(SendMessage request, SendResponse response) {
@@ -142,14 +145,21 @@ public class BotService {
         InlineKeyboardMarkup inlineKeyboard = null;
         String responseMsg = null;
         switch (command) {
+            case COMMAND_START:
+                return new SendMessage(chatId, "Добавить бота в чат: " + addlink)
+                        .parseMode(ParseMode.HTML)
+                        .disableWebPagePreview(true)
+                        .disableNotification(true)
+                        ;
             case COMMAND_STARTGAME:
+            case COMMAND_STARTGAME_FROM_GROUP:
                 try {
                     gameProcessor.start(m.chat().id(), m.from().id().longValue());
-                    responseMsg = m.from().firstName() + " " + m.from().lastName() + " начал игру";
+                    responseMsg = m.from().firstName() + " " + m.from().lastName() + " загадывает слово";
                     inlineKeyboard = new InlineKeyboardMarkup(
                             new InlineKeyboardButton[]{
                                     new InlineKeyboardButton("Слово").callbackData(ILQ_SHOWWORD),
-                                    new InlineKeyboardButton("Другое").callbackData(ILQ_CHANGEWORD)
+                                    new InlineKeyboardButton("Поменять").callbackData(ILQ_CHANGEWORD)
                             });
                 }
                 catch(AlligatorApplicationException ex) {
@@ -165,20 +175,25 @@ public class BotService {
         return null;
     }
 
-    private AnswerCallbackQuery processInlineQuery(CallbackQuery cbq) throws AlligatorApplicationException {
-        String response = null;
-        switch (cbq.data()) {
-            case ILQ_SHOWWORD:
-                response = gameProcessor.showWord(cbq.message().chat().id(), cbq.from().id().longValue());
-                break;
-            case ILQ_CHANGEWORD:
-                response = gameProcessor.nextWord(cbq.message().chat().id(), cbq.from().id().longValue());
-                break;
+    private AnswerCallbackQuery processInlineQuery(CallbackQuery cbq) {
+        try {
+            String response = null;
+            switch (cbq.data()) {
+                case ILQ_SHOWWORD:
+                    response = gameProcessor.showWord(cbq.message().chat().id(), cbq.from().id().longValue());
+                    break;
+                case ILQ_CHANGEWORD:
+                    response = gameProcessor.nextWord(cbq.message().chat().id(), cbq.from().id().longValue());
+                    break;
+            }
+            AnswerCallbackQuery answer = new AnswerCallbackQuery(cbq.id());
+            answer.text(response);
+            answer.showAlert(true);
+            return answer;
+        } catch (AlligatorApplicationException ex) {
+            log.error(ex.getError().errmsg());
         }
-        AnswerCallbackQuery answer = new AnswerCallbackQuery(cbq.id());
-        answer.text(response);
-        answer.showAlert(true);
-        return answer;
+        return null;
     }
 }
 

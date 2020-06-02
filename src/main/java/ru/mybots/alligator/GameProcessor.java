@@ -24,6 +24,9 @@ public class GameProcessor {
     public void init() {
         try {
             games = repo.loadGames();
+            games.forEach((k,v) -> {
+                chatSet.add(k);
+            });
         } catch (AlligatorApplicationException e) {
             e.printStackTrace();
         }
@@ -38,19 +41,17 @@ public class GameProcessor {
             g = Game.create(chatId, leadId, word);
             games.put(chatId, g);
             repo.insertGame(g);
-
             chatSet.add(chatId);
         }
     }
 
     public boolean tryWord(Long chatId, Long userId, String tryWord) throws AlligatorApplicationException {
         Game g = games.get(chatId);
-        if(g != null && g.isActive()) {
+        if(g != null && g.isActive() && !userId.equals(g.getLeadId())) {
             if(g.getWord().getText().equalsIgnoreCase(tryWord.trim())) {
-                g.setWord(null);
-                g.setLeadId(null);
-                g.setActive(0);
-                repo.updateGame(g);
+                repo.deleteGame(g);
+                games.remove(g.getChatId());
+                chatSet.remove(g.getChatId());
                 return true;
             }
         }
@@ -59,14 +60,9 @@ public class GameProcessor {
 
     public boolean wannaBeLeader(Long chatId, Long leadId) throws AlligatorApplicationException {
         Game g = games.get(chatId);
-        if(g != null && g.isActive()) {
-            if(g.getLeadId() == null) {
-                Word word = repo.nextWord(g);
-                g.setLeadId(leadId);
-                g.setWord(word);
-                repo.updateGame(g);
-                return true;
-            }
+        if(g == null) {
+            start(chatId, leadId);
+            return true;
         }
         return false;
     }
@@ -80,6 +76,7 @@ public class GameProcessor {
             Word word = repo.nextWord(g);
             g.setWord(word);
             repo.updateGame(g);
+            return word.getText();
         }
         return Game.NO_GAME;
     }
@@ -89,8 +86,9 @@ public class GameProcessor {
         if(g != null && g.isActive()) {
             g.setActive(0);
             games.remove(chatId);
+            chatSet.remove(chatId);
+            repo.deleteGame(g);
         }
-        repo.updateGame(g);
     }
 
     public String showWord(Long chatId, Long userId) {

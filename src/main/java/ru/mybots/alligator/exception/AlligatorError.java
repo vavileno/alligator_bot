@@ -7,7 +7,8 @@ public enum AlligatorError {
     DB_FAILED_LOAD_GAME(1002, "Failed to load all games" ),
     DB_FAILED_GET_CURRENT_WORD(1003, "Failed to get current word"),
     DB_FAILED_GET_CURRENT_GAME(1004, "Failed to get current game"),
-    DB_FAILED_UPDATE(1005, "Failed to update DB record");
+    DB_FAILED_UPDATE(1005, "Failed to update DB record"),
+    DB_FAILED_DELETE(1006, "Failed to delete DB record" );
 
 
     private final int code;

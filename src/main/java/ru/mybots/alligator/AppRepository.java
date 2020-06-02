@@ -7,7 +7,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import ru.mybots.alligator.exception.AlligatorApplicationException;
 import ru.mybots.alligator.exception.AlligatorError;
-import ru.mybots.alligator.exception.UserError;
+
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -34,14 +34,11 @@ public class AppRepository {
                     resultSet.getLong("lead_id"),
                     new Word(resultSet.getLong("word_id"), resultSet.getString("text"))
                 );
+                g.setGameId(resultSet.getLong("game_id"));
 
-                return null;
+                return g;
             }
         });
-
-        if(queryResult.isEmpty()) {
-            throw new AlligatorApplicationException(AlligatorError.DB_FAILED_LOAD_GAME);
-        }
 
         Map<Long, Game> result = new HashMap<>();
         queryResult.stream().forEach(item -> {
@@ -51,7 +48,7 @@ public class AppRepository {
     }
 
     public void insertGame(Game g) throws AlligatorApplicationException {
-        int result = jdbcTemplate.update(AppQueries.INSERT_GAME.sql(), g.getChatId(), g.getLeadId(), Game.ACTIVE);
+        int result = jdbcTemplate.update(AppQueries.INSERT_GAME.sql(), g.getChatId(), g.getLeadId(), g.getWord().getId(), Game.ACTIVE);
         if(result != 1) {
             throw new AlligatorApplicationException(AlligatorError.DB_FAILED_INSERT);
         }
@@ -109,6 +106,13 @@ public class AppRepository {
         return queryResult.get(0);
     }
 
+    public void deleteGame(Game g) throws AlligatorApplicationException {
+        int result = jdbcTemplate.update(AppQueries.DELETE_GAME.sql(),
+                g.getChatId(), g.getLeadId(), g.getWord().getId(), g.getActive(), g.getGameId());
+        if(result != 1) {
+            throw new AlligatorApplicationException(AlligatorError.DB_FAILED_DELETE);
+        }
+    }
 
     public void test() {
         List<Object> l = jdbcTemplate.query("SELECT * from RATINGS", new RowMapper<Object>() {
@@ -121,4 +125,5 @@ public class AppRepository {
         //Print read records:
         l.forEach(System.out::println);
     }
+
 }
