@@ -1,9 +1,13 @@
 package ru.mybots.alligator;
 
+import com.pengrad.telegrambot.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+import ru.mybots.alligator.exception.AlligatorApplicationException;
+import ru.mybots.alligator.exception.AlligatorError;
+import ru.mybots.alligator.exception.UserError;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -17,7 +21,7 @@ public class AppRepository {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    public Map<Long, Game> loadGames() {
+    public Map<Long, Game> loadGames() throws AlligatorApplicationException {
         List<Game> queryResult = jdbcTemplate.query(AppQueries.ALL_GAMES.sql(), new RowMapper<Game>() {
             @Override
             public Game mapRow(ResultSet resultSet, int i) throws SQLException {
@@ -28,12 +32,16 @@ public class AppRepository {
                 Game g = Game.create(
                     resultSet.getLong("chat_id"),
                     resultSet.getLong("lead_id"),
-                    resultSet.getLong("word_id")
+                    new Word(resultSet.getLong("word_id"), resultSet.getString("text"))
                 );
 
                 return null;
             }
         });
+
+        if(queryResult.isEmpty()) {
+            throw new AlligatorApplicationException(AlligatorError.DB_FAILED_LOAD_GAME);
+        }
 
         Map<Long, Game> result = new HashMap<>();
         queryResult.stream().forEach(item -> {
@@ -41,6 +49,66 @@ public class AppRepository {
         });
         return result;
     }
+
+    public void insertGame(Game g) throws AlligatorApplicationException {
+        int result = jdbcTemplate.update(AppQueries.INSERT_GAME.sql(), g.getChatId(), g.getLeadId(), Game.ACTIVE);
+        if(result != 1) {
+            throw new AlligatorApplicationException(AlligatorError.DB_FAILED_INSERT);
+        }
+    }
+
+    public void updateGame(Game g) throws AlligatorApplicationException {
+        int result = jdbcTemplate.update(AppQueries.UPDATE_GAME.sql(),
+                g.getChatId(), g.getLeadId(), g.getWord().getId(), g.getActive(), g.getGameId());
+        if(result != 1) {
+            throw new AlligatorApplicationException(AlligatorError.DB_FAILED_UPDATE);
+        }
+    }
+
+
+    public Word nextWord(Game g) throws AlligatorApplicationException {
+        List<Word> queryResult = jdbcTemplate.query(AppQueries.NEXT_WORD.sql(), new RowMapper<Word>() {
+            @Override
+            public Word mapRow(ResultSet resultSet, int i) throws SQLException {
+                Word g = new Word(
+                        resultSet.getLong("id"),
+                        resultSet.getString("text")
+                );
+                return g;
+            }
+        });
+
+        if(queryResult.isEmpty()) {
+            throw new AlligatorApplicationException(AlligatorError.DB_FAILED_NEXT_WORD);
+        }
+        return queryResult.get(0);
+    }
+
+    public Game currentGame(Long chatId, Long leadId) throws AlligatorApplicationException {
+        List<Game> queryResult = jdbcTemplate.query(AppQueries.CURRENT_GAME.sql(), new Object[] { chatId } , new RowMapper<Game>() {
+            @Override
+            public Game mapRow(ResultSet resultSet, int i) throws SQLException {
+                resultSet.getLong("game_id");
+                resultSet.getLong("chat_id");
+                resultSet.getLong("lead_id");
+                resultSet.getLong("word_id");
+
+                Game g = Game.create(
+                    resultSet.getLong("chat_id"),
+                    resultSet.getLong("lead_id"),
+                    new Word(resultSet.getLong("word_id"), resultSet.getString("text"))
+                );
+                g.setGameId(resultSet.getLong("game_id"));
+                return g;
+            }
+        });
+
+        if(queryResult.isEmpty()) {
+            throw new AlligatorApplicationException(AlligatorError.DB_FAILED_GET_CURRENT_GAME);
+        }
+        return queryResult.get(0);
+    }
+
 
     public void test() {
         List<Object> l = jdbcTemplate.query("SELECT * from RATINGS", new RowMapper<Object>() {
@@ -53,6 +121,4 @@ public class AppRepository {
         //Print read records:
         l.forEach(System.out::println);
     }
-
-
 }

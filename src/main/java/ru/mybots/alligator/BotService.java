@@ -13,7 +13,11 @@ import com.pengrad.telegrambot.request.AnswerCallbackQuery;
 import com.pengrad.telegrambot.request.SendMessage;
 import com.pengrad.telegrambot.response.SendResponse;
 import okhttp3.OkHttpClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import ru.mybots.alligator.exception.AlligatorApplicationException;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
@@ -27,6 +31,17 @@ import java.util.List;
 @Service
 public class BotService {
 
+    private static final Logger log = LoggerFactory.getLogger(BotService.class);
+
+    private final String COMMAND_STARTGAME = "startgame";
+
+    private final String ILQ_SHOWWORD = "showword";
+    private final String ILQ_CHANGEWORD = "changeword";
+    private final String ILQ_WANNA_BE_LEADER = "wannabeleader";
+
+    @Autowired
+    private GameProcessor gameProcessor;
+
     @PostConstruct
     public void init() throws UnknownHostException {
         OkHttpClient.Builder builder = new OkHttpClient.Builder();
@@ -35,64 +50,135 @@ public class BotService {
 
         final TelegramBot bot = new TelegramBot.Builder("1169475233:AAFmCL-3TRZvT2D3XzvkfzUeKMzVl6gcn-Q").okHttpClient(builder.build()).build();
 
+        ;
+
         // Register for updates
         bot.setUpdatesListener(new UpdatesListener() {
             @Override
             public int process(List<Update> updates) {
 
-                if(updates.isEmpty()) {
+                if (updates.isEmpty()) {
                     return UpdatesListener.CONFIRMED_UPDATES_ALL;
                 }
 
-                Message m = updates.get(0).message();
-                CallbackQuery cbq = updates.get(0).callbackQuery();
+                for (Update update : updates) {
+                    Message m = update.message();
+                    CallbackQuery cbq = update.callbackQuery();
 
-                if(cbq != null) {
-                    AnswerCallbackQuery answer = new AnswerCallbackQuery(cbq.id());
-                    answer.text("Ай да ту сабулу буды");
-                    answer.showAlert(true);
+                    if (m == null) {
+                        continue;
+                    }
 
-                    bot.execute(answer);
-                }
+                    SendMessage request = null;
 
-                if(m == null) {
-                    return UpdatesListener.CONFIRMED_UPDATES_ALL;
-                }
+                    // Chat has no current game so process only commands
+                    if(!gameProcessor.chatSet().contains(m.chat().id())) {
+                        if (!m.text().startsWith("/") && cbq == null) {
+                            continue;
+                        }
+                    }
 
+                    try {
+                        if (cbq != null) {
+                            AnswerCallbackQuery answer = processInlineQuery(cbq);
+                            bot.execute(answer);
+                            return UpdatesListener.CONFIRMED_UPDATES_ALL;
+                        }
+                    } catch (AlligatorApplicationException ex) {
+                        log.error(ex.getError().errmsg());
+                    }
 
-                Long chatId = updates.get(0).message().chat().id();
+                    if (m.text().startsWith("/")) {
+                        request = processCommand(update);
+                    } else {
+                        request = processText(update);
+                    }
 
-                InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(
-                        new InlineKeyboardButton[]{
-                                new InlineKeyboardButton("url").url("https://www.ya.ru"),
-                                new InlineKeyboardButton("callback_data").callbackData("callback_data"),
-                                new InlineKeyboardButton("Switch!").switchInlineQuery("switch_inline_query")
+                    if (request != null) {
+                        // async
+                        bot.execute(request, new Callback<SendMessage, SendResponse>() {
+                            @Override
+                            public void onResponse(SendMessage request, SendResponse response) {
+                            }
+                            @Override
+                            public void onFailure(SendMessage request, IOException e) {
+                            }
                         });
+                    }
+                }
+                return UpdatesListener.CONFIRMED_UPDATES_ALL;
+            }
+        });
+    }
 
-                SendMessage request = new SendMessage(chatId, "Бузя")
+
+    private SendMessage processText(Update update) {
+        try {
+            Message m = update.message();
+            if(gameProcessor.tryWord(m.chat().id(), m.from().id().longValue(), m.text())) {
+                InlineKeyboardMarkup inlineKeyboard = null;
+                String responseMsg = m.from().firstName() + " " + m.from().lastName() + " угадал слово " + m.text().trim().toLowerCase();
+                inlineKeyboard = new InlineKeyboardMarkup(
+                        new InlineKeyboardButton[]{
+                                new InlineKeyboardButton("Загадать").callbackData(ILQ_WANNA_BE_LEADER),
+                        });
+                return new SendMessage(m.chat().id(), responseMsg)
                         .parseMode(ParseMode.HTML)
                         .disableWebPagePreview(true)
                         .disableNotification(true)
                         .replyMarkup(inlineKeyboard)
                         ;
-////                        .replyToMessageId(1)
-//                        .replyMarkup(new ForceReply());
-
-                // async
-                bot.execute(request, new Callback<SendMessage, SendResponse>() {
-                    @Override
-                    public void onResponse(SendMessage request, SendResponse response) {
-
-                    }
-
-                    @Override
-                    public void onFailure(SendMessage request, IOException e) {
-
-                    }
-                });
-                return UpdatesListener.CONFIRMED_UPDATES_ALL;
             }
-        });
+        } catch (AlligatorApplicationException e) {
+            log.error(e.getError().errmsg());
+        }
+        return null;
+    }
+
+    private SendMessage processCommand(Update update)  {
+        Message m = update.message();
+        Long chatId = m.chat().id();
+        String command = m.text().substring(1);
+        InlineKeyboardMarkup inlineKeyboard = null;
+        String responseMsg = null;
+        switch (command) {
+            case COMMAND_STARTGAME:
+                try {
+                    gameProcessor.start(m.chat().id(), m.from().id().longValue());
+                    responseMsg = m.from().firstName() + " " + m.from().lastName() + " начал игру";
+                    inlineKeyboard = new InlineKeyboardMarkup(
+                            new InlineKeyboardButton[]{
+                                    new InlineKeyboardButton("Слово").callbackData(ILQ_SHOWWORD),
+                                    new InlineKeyboardButton("Другое").callbackData(ILQ_CHANGEWORD)
+                            });
+                }
+                catch(AlligatorApplicationException ex) {
+                    log.error(ex.getError().errmsg());
+                }
+                return new SendMessage(chatId, responseMsg)
+                        .parseMode(ParseMode.HTML)
+                        .disableWebPagePreview(true)
+                        .disableNotification(true)
+                        .replyMarkup(inlineKeyboard)
+                ;
+        }
+        return null;
+    }
+
+    private AnswerCallbackQuery processInlineQuery(CallbackQuery cbq) throws AlligatorApplicationException {
+        String response = null;
+        switch (cbq.data()) {
+            case ILQ_SHOWWORD:
+                response = gameProcessor.showWord(cbq.message().chat().id(), cbq.from().id().longValue());
+                break;
+            case ILQ_CHANGEWORD:
+                response = gameProcessor.nextWord(cbq.message().chat().id(), cbq.from().id().longValue());
+                break;
+        }
+        AnswerCallbackQuery answer = new AnswerCallbackQuery(cbq.id());
+        answer.text(response);
+        answer.showAlert(true);
+        return answer;
     }
 }
 
@@ -111,6 +197,24 @@ class MyAuthenticator extends java.net.Authenticator {
         return new PasswordAuthentication(pUser, pH.toCharArray());
     }
 }
+
+
+//
+//                SendMessage request = new SendMessage(chatId, "Бузя")
+//                        .parseMode(ParseMode.HTML)
+//                        .disableWebPagePreview(true)
+//                        .disableNotification(true)
+//                        .replyMarkup(inlineKeyboard)
+//                        ;
+////                        .replyToMessageId(1)
+//                        .replyMarkup(new ForceReply());
+
+//    InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(
+//            new InlineKeyboardButton[]{
+//                    new InlineKeyboardButton("url").url("https://www.ya.ru"),
+//                    new InlineKeyboardButton("callback_data").callbackData("callback_data"),
+//                    new InlineKeyboardButton("Switch!").switchInlineQuery("switch_inline_query")
+//            });
 
 // sync
 //                SendResponse sendResponse = bot.execute(request);
