@@ -8,7 +8,8 @@ public enum AlligatorError {
     DB_FAILED_GET_CURRENT_WORD(1003, "Failed to get current word"),
     DB_FAILED_GET_CURRENT_GAME(1004, "Failed to get current game"),
     DB_FAILED_UPDATE(1005, "Failed to update DB record"),
-    DB_FAILED_DELETE(1006, "Failed to delete DB record" );
+    DB_FAILED_DELETE(1006, "Failed to delete DB record" ),
+    DB_FAILED_START_GAME(1007, "Failed to start new game");
 
 
     private final int code;
@@ -26,5 +27,6 @@ public enum AlligatorError {
     public String errmsg() {
         return errmsg;
     }
+
 
 }
