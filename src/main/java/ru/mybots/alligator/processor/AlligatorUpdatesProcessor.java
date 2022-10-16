@@ -8,6 +8,7 @@ import com.pengrad.telegrambot.model.request.InlineKeyboardMarkup;
 import com.pengrad.telegrambot.model.request.ParseMode;
 import com.pengrad.telegrambot.request.AnswerCallbackQuery;
 import com.pengrad.telegrambot.request.SendMessage;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,7 +60,7 @@ public class AlligatorUpdatesProcessor implements UpdatesProcessor {
         Long chatId = m.chat().id();
         String command = m.text().substring(1);
         InlineKeyboardMarkup inlineKeyboard = null;
-        String responseMsg = null;
+        StringBuilder responseMsg = new StringBuilder( StringUtils.defaultString(m.from().firstName()) );
         switch (command) {
             case COMMAND_START:
                 return new SendMessage(chatId, "Добавить бота в чат: " + addlink)
@@ -70,18 +71,18 @@ public class AlligatorUpdatesProcessor implements UpdatesProcessor {
             case COMMAND_STARTGAME:
             case COMMAND_STARTGAME_FROM_GROUP:
                 try {
-                    alligator.start(m.chat().id(), m.from().id().longValue());
-                    responseMsg = m.from().firstName() + " " + m.from().lastName() + " загадывает слово";
+                    alligator.start(m.chat().id(), m.from().id());
+                    responseMsg.append(" ")
+                            .append(StringUtils.defaultString(m.from().lastName()))
+                            .append(" загадывает слово");
                     inlineKeyboard = new InlineKeyboardMarkup(
-                            new InlineKeyboardButton[]{
-                                    new InlineKeyboardButton("Слово").callbackData(ILQ_SHOWWORD),
-                                    new InlineKeyboardButton("Поменять").callbackData(ILQ_CHANGEWORD)
-                            });
+                            new InlineKeyboardButton("Слово").callbackData(ILQ_SHOWWORD),
+                            new InlineKeyboardButton("Поменять").callbackData(ILQ_CHANGEWORD));
                 }
                 catch(AlligatorApplicationException ex) {
                     log.error(ex.getError().errmsg());
                 }
-                return new SendMessage(chatId, responseMsg)
+                return new SendMessage(chatId, responseMsg.toString())
                         .parseMode(ParseMode.HTML)
                         .disableWebPagePreview(true)
                         .disableNotification(true)
@@ -94,17 +95,18 @@ public class AlligatorUpdatesProcessor implements UpdatesProcessor {
     private ProcessResult processInlineQuery(CallbackQuery cbq) {
         try {
             String response = null;
+            StringBuilder responseMsg = new StringBuilder( StringUtils.defaultString(cbq.message().from().firstName()) );
             switch (cbq.data()) {
                 case ILQ_WANNA_BE_LEADER:
-                    boolean result = alligator.wannaBeLeader(cbq.message().chat().id(), cbq.from().id().longValue());
+                    boolean result = alligator.wannaBeLeader(cbq.message().chat().id(), cbq.from().id());
                     if(result) {
-                        String responseMsg = cbq.message().from().firstName() + " " + cbq.message().from().lastName() + " загадывает слово";
+                        responseMsg.append(" ")
+                                .append(StringUtils.defaultString(cbq.message().from().lastName()))
+                                .append(" загадывает слово");
                         InlineKeyboardMarkup inlineKeyboard = inlineKeyboard = new InlineKeyboardMarkup(
-                                new InlineKeyboardButton[]{
-                                        new InlineKeyboardButton("Слово").callbackData(ILQ_SHOWWORD),
-                                        new InlineKeyboardButton("Поменять").callbackData(ILQ_CHANGEWORD)
-                                });
-                        SendMessage message = new SendMessage(cbq.message().chat().id(), responseMsg)
+                                new InlineKeyboardButton("Слово").callbackData(ILQ_SHOWWORD),
+                                new InlineKeyboardButton("Поменять").callbackData(ILQ_CHANGEWORD));
+                        SendMessage message = new SendMessage(cbq.message().chat().id(), responseMsg.toString())
                                 .parseMode(ParseMode.HTML)
                                 .disableWebPagePreview(true)
                                 .disableNotification(true)
@@ -116,10 +118,10 @@ public class AlligatorUpdatesProcessor implements UpdatesProcessor {
                     }
                     break;
                 case ILQ_SHOWWORD:
-                    response = alligator.showWord(cbq.message().chat().id(), cbq.from().id().longValue());
+                    response = alligator.showWord(cbq.message().chat().id(), cbq.from().id());
                     break;
                 case ILQ_CHANGEWORD:
-                    response = alligator.nextWord(cbq.message().chat().id(), cbq.from().id().longValue());
+                    response = alligator.nextWord(cbq.message().chat().id(), cbq.from().id());
                     break;
 
             }
@@ -136,14 +138,15 @@ public class AlligatorUpdatesProcessor implements UpdatesProcessor {
     private SendMessage processText(Update update) {
         try {
             Message m = update.message();
-            if(alligator.tryWord(m.chat().id(), m.from().id().longValue(), m.text())) {
+            if(alligator.gameActive(m.chat().id()) && alligator.tryWord(m.chat().id(), m.from().id(), m.text())) {
                 InlineKeyboardMarkup inlineKeyboard = null;
-                String responseMsg = m.from().firstName() + " " + m.from().lastName() + " угадал слово " + m.text().trim().toLowerCase();
+                StringBuilder responseMsg = new StringBuilder(StringUtils.defaultString(m.from().firstName()));
+                responseMsg.append(" ")
+                        .append(StringUtils.defaultString(m.from().lastName())).append(" угадал слово ")
+                        .append(m.text().trim().toLowerCase());
                 inlineKeyboard = new InlineKeyboardMarkup(
-                        new InlineKeyboardButton[]{
-                                new InlineKeyboardButton("Хочу загадать").callbackData(ILQ_WANNA_BE_LEADER),
-                        });
-                return new SendMessage(m.chat().id(), responseMsg)
+                        new InlineKeyboardButton("Хочу загадать").callbackData(ILQ_WANNA_BE_LEADER));
+                return new SendMessage(m.chat().id(), responseMsg.toString())
                         .parseMode(ParseMode.HTML)
                         .disableWebPagePreview(true)
                         .disableNotification(true)

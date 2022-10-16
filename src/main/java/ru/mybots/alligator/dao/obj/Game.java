@@ -1,9 +1,13 @@
 package ru.mybots.alligator.dao.obj;
 
+import java.util.Date;
+
 public class Game {
 
-    public static final int ACTIVE = 1;
-    public static final int INACTIVE = 0;
+    public static final boolean ACTIVE = true;
+    public static final boolean INACTIVE = false;
+
+    public static final long GAME_TIMEOUT_MINUTES = 30;
 
     public static final String NOT_LEADER = "Ведущий не ты";
     public static final String NO_GAME = "Нет игры";
@@ -16,18 +20,22 @@ public class Game {
     private Long leadId;
     private final Long chatId;
     private Long lastOrd;
-    private int active;
+    private boolean active;
+    private Date startDate;
+    private Date lastMoveDate;
 
     private Game(Long chatId) {
         this.chatId = chatId;
     }
 
-    public static Game create(long chatId, Long leadId, Long lastOrd, Integer active, Word word) {
+    public static Game createInstance(long chatId, Long leadId, Long lastOrd, boolean active, Word word, Date startDate, Date lastMoveDate) {
         Game g = new Game(chatId);
         g.setLeadId(leadId);
         g.setActive(active);
         g.setLastOrd(lastOrd);
         g.setWord(word);
+        g.setStartDate(startDate);
+        g.setLastMoveDate(lastMoveDate);
         return g;
     }
 
@@ -51,16 +59,16 @@ public class Game {
         return chatId;
     }
 
-    public int getActive() {
+    public boolean getActive() {
         return active;
     }
 
-    public void setActive(int active) {
+    public void setActive(boolean active) {
         this.active = active;
     }
 
     public boolean isActive() {
-        return this.active == 1;
+        return this.active;
     }
 
     public Long getGameId() {
@@ -77,5 +85,21 @@ public class Game {
 
     public void setLastOrd(Long lastOrd) {
         this.lastOrd = lastOrd;
+    }
+
+    public Date getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(Date startDate) {
+        this.startDate = startDate;
+    }
+
+    public Date getLastMoveDate() {
+        return lastMoveDate;
+    }
+
+    public void setLastMoveDate(Date lastMoveDate) {
+        this.lastMoveDate = lastMoveDate;
     }
 }

@@ -1,0 +1,13 @@
+version: '3'
+services:
+    db:
+        build: docker/postgres/
+        image: postgres:14.5
+        container_name: allidb
+        environment:
+            LANG: "ru_RU.utf8"
+        volumes:
+            - ./docker/postgres/postgresql.conf:/etc/postgresql.conf
+        command: -c config_file=/etc/postgresql.conf
+        ports:
+            - ${POSTGRES_PORT_OUT}:${POSTGRES_PORT}

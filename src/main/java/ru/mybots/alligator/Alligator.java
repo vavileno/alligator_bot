@@ -6,9 +6,9 @@ import ru.mybots.alligator.dao.AppRepository;
 import ru.mybots.alligator.exception.AlligatorApplicationException;
 import ru.mybots.alligator.dao.obj.Game;
 import ru.mybots.alligator.dao.obj.Word;
-import ru.mybots.alligator.exception.AlligatorError;
 
 import javax.annotation.PostConstruct;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -42,32 +42,44 @@ public class Alligator {
     }
 
     public String start(Long chatId, Long leadId) throws AlligatorApplicationException {
-        Game g = games.get(chatId);
+//        Game g = games.get(chatId);
 
+        return initGame(chatId, leadId);
         //TODO: в каком случае допустим запуск новой игры
-        if(g == null) {
-            g = repo.lastGame(chatId, leadId);
+//        if(g == null) {
+//            g = repo.lastGame(chatId, leadId);
+//
+//            // This chat plays for the first time
+//            if(g == null) {
+//
+//            }
+//            // This chat already played before and creates new game
+//            else {
+//                Word word = repo.nextWord(g);
+//                g = Game.create(chatId, leadId, word.getOrd(), Game.ACTIVE, word);
+//                games.put(chatId, g);
+//                repo.updateGame(g);
+//                chatSet.add(chatId);
+//                return word.getText();
+//            }
+//
+//        }
+//        else {
+//            return g.getWord().getText();
+//        }
+    }
 
-            // This chat plays for the first time
-            if(g == null) {
-                initGame(chatId, leadId);
-            }
-            // This chat already played before and creates new game
-            else {
-                Word word = repo.nextWord(g);
-                g = Game.create(chatId, leadId, word.getOrd(), Game.ACTIVE, word);
-                games.put(chatId, g);
-                repo.updateGame(g);
-                chatSet.add(chatId);
-                return word.getText();
-            }
-
-        }
-        throw new AlligatorApplicationException(AlligatorError.DB_FAILED_START_GAME);
+    public boolean gameActive(Long chatId) {
+        Game g = games.get(chatId);
+        if(g == null) { return false; }
+        long timeSinceLastMove = new Date().getTime() - g.getLastMoveDate().getTime();
+        return g.isActive() && timeSinceLastMove < Game.GAME_TIMEOUT_MINUTES * 60 * 1000;
     }
 
     private String initGame(Long chatId, Long leadId) throws AlligatorApplicationException {
-        Game g = Game.create(chatId, leadId, Math.round(Math.random()*10000), Game.ACTIVE, null);
+//        long randomOrd = Math.round(Math.random()*10000);
+        Date now = new Date();
+        Game g = Game.createInstance(chatId, leadId, 1L, Game.ACTIVE, null, now, now);
         Word word = repo.nextWord(g);
         g.setWord(word);
         g.setLastOrd(word.getOrd());
@@ -80,7 +92,7 @@ public class Alligator {
     public boolean wannaBeLeader(Long chatId, Long userId) throws AlligatorApplicationException {
         Game g = games.get(chatId);
         if(g == null) {
-            g = repo.lastGame(chatId, userId);
+            g = repo.lastGame(chatId);
             if(g == null) {
                 initGame(chatId, userId);
                 g = games.get(chatId);
@@ -128,7 +140,7 @@ public class Alligator {
         Game g = games.get(chatId);
         if(g != null && g.isActive() && !userId.equals(g.getLeadId())) {
             if(g.getWord().getText().equalsIgnoreCase(tryWord.trim())) {
-                g.setActive(0);
+                g.setActive(Game.INACTIVE);
                 g.setLeadId(null);
                 repo.updateGame(g);
                 return true;
@@ -140,7 +152,7 @@ public class Alligator {
     public void end(Long chatId) throws AlligatorApplicationException {
         Game g = games.get(chatId);
         if(g != null && g.isActive()) {
-            g.setActive(0);
+            g.setActive(Game.INACTIVE);
             games.remove(chatId);
             chatSet.remove(chatId);
         }
@@ -151,4 +163,6 @@ public class Alligator {
     public Set<Long> chatSet() {
         return chatSet;
     }
+
+
 }

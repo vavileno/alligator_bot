@@ -56,7 +56,7 @@ public class BotService {
     @PostConstruct
     public void init() throws UnknownHostException {
         OkHttpClient.Builder builder = new OkHttpClient.Builder();
-        builder.proxy(new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(InetAddress.getByName("185.223.95.118"), 1080)));
+        builder.proxy(new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(InetAddress.getByName("45.159.189.36"), 1080)));
         java.net.Authenticator.setDefault(new MyAuthenticator());
 
         final TelegramBot bot = new TelegramBot.Builder("1169475233:AAFmCL-3TRZvT2D3XzvkfzUeKMzVl6gcn-Q").okHttpClient(builder.build()).build();

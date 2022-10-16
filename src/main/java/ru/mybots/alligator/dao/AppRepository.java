@@ -12,9 +12,11 @@ import ru.mybots.alligator.dao.obj.Word;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 @Repository
 public class AppRepository {
@@ -26,12 +28,18 @@ public class AppRepository {
         List<Game> queryResult = jdbcTemplate.query(AppQueries.ALL_GAMES.sql(), new RowMapper<Game>() {
             @Override
             public Game mapRow(ResultSet resultSet, int i) throws SQLException {
-                Game g = Game.create(
+                Game g = Game.createInstance(
                     resultSet.getLong("chat_id"),
                     resultSet.getLong("lead_id"),
                     resultSet.getLong("last_ord"),
-                    resultSet.getInt("active"),
-                    new Word(resultSet.getLong("word_id"), resultSet.getString("text"), resultSet.getLong("ord"))
+                    resultSet.getBoolean("active"),
+                    new Word(
+                            resultSet.getLong("word_id"),
+                            resultSet.getString("word_text"),
+                            resultSet.getLong("word_ord")
+                    ),
+                    resultSet.getTimestamp("start_date", Calendar.getInstance(TimeZone.getTimeZone("UTC"))),
+                    resultSet.getTimestamp("last_move_date", Calendar.getInstance(TimeZone.getTimeZone("UTC")))
                 );
                 g.setGameId(resultSet.getLong("game_id"));
                 return g;
@@ -39,14 +47,15 @@ public class AppRepository {
         });
 
         Map<Long, Game> result = new HashMap<>();
-        queryResult.stream().forEach(item -> {
+        queryResult.forEach(item -> {
             result.put(item.getChatId(), item);
         });
         return result;
     }
 
     public void insertGame(Game g) throws AlligatorApplicationException {
-        int result = jdbcTemplate.update(AppQueries.INSERT_GAME.sql(), g.getChatId(), g.getLeadId(), g.getWord().getId(), Game.ACTIVE);
+        int result = jdbcTemplate.update(AppQueries.INSERT_GAME.sql(),
+                g.getChatId(), g.getLeadId(), g.getWord().getId(), Game.ACTIVE, g.getStartDate(), g.getLastMoveDate());
         if(result != 1) {
             throw new AlligatorApplicationException(AlligatorError.DB_FAILED_INSERT);
         }
@@ -62,17 +71,17 @@ public class AppRepository {
 
 
     public Word nextWord(Game g) throws AlligatorApplicationException {
-        List<Word> queryResult = jdbcTemplate.query(AppQueries.NEXT_WORD.sql(), new Object[] { g.getLastOrd() }, new RowMapper<Word>() {
+        List<Word> queryResult = jdbcTemplate.query(AppQueries.NEXT_WORD.sql(), new RowMapper<Word>() {
             @Override
             public Word mapRow(ResultSet resultSet, int i) throws SQLException {
                 Word g = new Word(
-                        resultSet.getLong("id"),
-                        resultSet.getString("text"),
-                        resultSet.getLong("ord")
+                        resultSet.getLong("word_id"),
+                        resultSet.getString("word_text"),
+                        resultSet.getLong("word_ord")
                 );
                 return g;
             }
-        });
+        }, g.getLastOrd());
 
         if(queryResult.isEmpty()) {
             throw new AlligatorApplicationException(AlligatorError.DB_FAILED_NEXT_WORD);
@@ -80,24 +89,30 @@ public class AppRepository {
         return queryResult.get(0);
     }
 
-    public Game lastGame(Long chatId, Long leadId) throws AlligatorApplicationException {
-        List<Game> queryResult = jdbcTemplate.query(AppQueries.LAST_GAME.sql(), new Object[] { chatId } , new RowMapper<Game>() {
+    public Game lastGame(Long chatId) throws AlligatorApplicationException {
+        List<Game> queryResult = jdbcTemplate.query(AppQueries.LAST_GAME.sql(), new RowMapper<Game>() {
             @Override
             public Game mapRow(ResultSet resultSet, int i) throws SQLException {
-                Game g = Game.create(
+                Game g = Game.createInstance(
                         resultSet.getLong("chat_id"),
                         resultSet.getLong("lead_id"),
                         resultSet.getLong("last_ord"),
-                        resultSet.getInt("active"),
-                        new Word(resultSet.getLong("word_id"), resultSet.getString("text"), resultSet.getLong("ord"))
+                        resultSet.getBoolean("active"),
+                        new Word(
+                                resultSet.getLong("word_id"),
+                                resultSet.getString("word_text"),
+                                resultSet.getLong("word_ord")
+                        ),
+                        resultSet.getTimestamp("start_date", Calendar.getInstance(TimeZone.getTimeZone("UTC"))),
+                        resultSet.getTimestamp("last_move_date", Calendar.getInstance(TimeZone.getTimeZone("UTC")))
                 );
                 g.setGameId(resultSet.getLong("game_id"));
                 return g;
             }
-        });
+        }, chatId);
 
         if(queryResult.isEmpty()) {
-            throw new AlligatorApplicationException(AlligatorError.DB_FAILED_GET_CURRENT_GAME);
+            return null;
         }
         return queryResult.get(0);
     }
