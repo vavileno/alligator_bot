@@ -4,6 +4,7 @@ public class ProcessResult {
 
     public static final int MESSAGE = 1;
     public static final int ANSWER_CALLBACK_QUERY = 2;
+    public static final int NOOP = -1;
 
     private int resultType;
 

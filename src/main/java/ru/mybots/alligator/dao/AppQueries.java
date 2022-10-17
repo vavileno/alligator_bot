@@ -6,7 +6,7 @@ public enum AppQueries {
 
     INSERT_GAME("INSERT INTO GAME(chat_id, lead_id, last_ord, active, start_date, last_move_date) values(?,?,?,?,?,?)"),
 
-    UPDATE_GAME("UPDATE GAME set chat_id = ?, lead_id = ?, last_ord = ?, active = ? where game_id = ?"),
+    UPDATE_GAME("UPDATE GAME set chat_id = ?, lead_id = ?, last_ord = ?, active = ?, winner_id = ? where game_id = ?"),
 
     NEXT_WORD( "SELECT word_id, word_text, word_ord FROM WORD WHERE word_ord > ? ORDER BY word_ord LIMIT 1"),
 

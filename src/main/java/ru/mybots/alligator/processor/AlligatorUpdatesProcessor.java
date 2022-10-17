@@ -46,6 +46,9 @@ public class AlligatorUpdatesProcessor implements UpdatesProcessor {
         if(update.callbackQuery() != null) {
             return processInlineQuery(update.callbackQuery());
         }
+        if(m.text() == null) {
+            return new ProcessResult(ProcessResult.NOOP, null);
+        }
         if (m.text().startsWith("/")) {
             Object result = processCommand(update);
             return new ProcessResult(ProcessResult.MESSAGE, result);
@@ -138,7 +141,7 @@ public class AlligatorUpdatesProcessor implements UpdatesProcessor {
     private SendMessage processText(Update update) {
         try {
             Message m = update.message();
-            if(alligator.gameActive(m.chat().id()) && alligator.tryWord(m.chat().id(), m.from().id(), m.text())) {
+            if(alligator.hasActiveGame(m.chat().id()) && alligator.tryWord(m.chat().id(), m.from().id(), m.text())) {
                 InlineKeyboardMarkup inlineKeyboard = null;
                 StringBuilder responseMsg = new StringBuilder(StringUtils.defaultString(m.from().firstName()));
                 responseMsg.append(" ")

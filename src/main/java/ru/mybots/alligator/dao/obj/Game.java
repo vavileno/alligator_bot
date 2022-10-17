@@ -23,6 +23,7 @@ public class Game {
     private boolean active;
     private Date startDate;
     private Date lastMoveDate;
+    private Long winnerId;
 
     private Game(Long chatId) {
         this.chatId = chatId;
@@ -68,7 +69,12 @@ public class Game {
     }
 
     public boolean isActive() {
-        return this.active;
+        return active;
+    }
+
+    public boolean isGameActive() {
+        long timeSinceLastMove = new Date().getTime() - getLastMoveDate().getTime();
+        return this.active && timeSinceLastMove < Game.GAME_TIMEOUT_MINUTES * 60 * 1000;
     }
 
     public Long getGameId() {
@@ -101,5 +107,13 @@ public class Game {
 
     public void setLastMoveDate(Date lastMoveDate) {
         this.lastMoveDate = lastMoveDate;
+    }
+
+    public Long getWinnerId() {
+        return winnerId;
+    }
+
+    public void setWinnerId(Long winnerId) {
+        this.winnerId = winnerId;
     }
 }

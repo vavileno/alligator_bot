@@ -63,13 +63,13 @@ public class AppRepository {
 
     public void updateGame(Game g) throws AlligatorApplicationException {
         int result = jdbcTemplate.update(AppQueries.UPDATE_GAME.sql(),
-                g.getChatId(), g.getLeadId(), g.getLastOrd(), g.getActive(), g.getGameId());
+                g.getChatId(), g.getLeadId(), g.getLastOrd(), g.getActive(), g.getWinnerId(), g.getGameId());
         if(result != 1) {
             throw new AlligatorApplicationException(AlligatorError.DB_FAILED_UPDATE);
         }
     }
 
-
+//TODO: shuffling word order
     public Word nextWord(Game g) throws AlligatorApplicationException {
         List<Word> queryResult = jdbcTemplate.query(AppQueries.NEXT_WORD.sql(), new RowMapper<Word>() {
             @Override
@@ -84,7 +84,20 @@ public class AppRepository {
         }, g.getLastOrd());
 
         if(queryResult.isEmpty()) {
-            throw new AlligatorApplicationException(AlligatorError.DB_FAILED_NEXT_WORD);
+            queryResult = jdbcTemplate.query(AppQueries.NEXT_WORD.sql(), new RowMapper<Word>() {
+                @Override
+                public Word mapRow(ResultSet resultSet, int i) throws SQLException {
+                    Word g = new Word(
+                            resultSet.getLong("word_id"),
+                            resultSet.getString("word_text"),
+                            resultSet.getLong("word_ord")
+                    );
+                    return g;
+                }
+            }, 0);
+            if(queryResult.isEmpty()) {
+                throw new AlligatorApplicationException(AlligatorError.DB_FAILED_NEXT_WORD);
+            }
         }
         return queryResult.get(0);
     }

@@ -76,6 +76,8 @@ public class BotService {
                     ProcessResult result = updatesProcessor.process(update);
 
                     switch (result.getResultType()) {
+                        case ProcessResult.NOOP:
+                            continue;
                         case ProcessResult.MESSAGE:
                             SendMessage request = (SendMessage)result.getContent();
                             if (request != null) {
