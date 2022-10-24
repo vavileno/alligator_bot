@@ -1,0 +1,1 @@
+alter table WORD drop column word_ord;

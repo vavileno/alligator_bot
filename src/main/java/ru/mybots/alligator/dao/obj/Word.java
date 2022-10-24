@@ -6,12 +6,9 @@ public class Word {
 
     private String text;
 
-    private Long ord;
-
-    public Word(Long id, String text, Long ord) {
+    public Word(Long id, String text) {
         this.id = id;
         this.text = text;
-        this.ord = ord;
     }
 
     public Long getId() {
@@ -30,11 +27,4 @@ public class Word {
         this.text = text;
     }
 
-    public Long getOrd() {
-        return ord;
-    }
-
-    public void setOrd(Long ord) {
-        this.ord = ord;
-    }
 }

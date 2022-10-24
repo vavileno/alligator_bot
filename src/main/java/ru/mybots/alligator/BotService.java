@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ru.mybots.alligator.filter.UpdatesFilter;
 import ru.mybots.alligator.processor.ProcessResult;
-import ru.mybots.alligator.processor.UpdatesProcessor;
+import ru.mybots.alligator.processor.AlligatorUpdatesProcessor;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
@@ -34,7 +34,7 @@ public class BotService {
     private Alligator alligator;
 
     @Autowired
-    private UpdatesProcessor updatesProcessor;
+    private AlligatorUpdatesProcessor updatesProcessor;
     @Autowired
     private UpdatesFilter updatesFilter;
 
@@ -59,8 +59,7 @@ public class BotService {
         builder.proxy(new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(InetAddress.getByName("45.159.189.36"), 1080)));
         java.net.Authenticator.setDefault(new MyAuthenticator());
 
-        final TelegramBot bot = new TelegramBot.Builder("1169475233:AAFmCL-3TRZvT2D3XzvkfzUeKMzVl6gcn-Q").okHttpClient(builder.build()).build();
-
+        final TelegramBot bot = new TelegramBot.Builder("5119841589:AAGLodZA3B3vC9FGIz2Ho9ES-A3Th0XeGmw").okHttpClient(builder.build()).build();
         // Register for updates
         bot.setUpdatesListener(new UpdatesListener() {
             @Override
@@ -69,34 +68,52 @@ public class BotService {
                     return UpdatesListener.CONFIRMED_UPDATES_ALL;
                 }
                 for (Update update : updates) {
-                    if(!updatesFilter.filter(update)) {
-                        continue;
-                    }
-
-                    ProcessResult result = updatesProcessor.process(update);
-
-                    switch (result.getResultType()) {
-                        case ProcessResult.NOOP:
+                    try {
+                        if (!updatesFilter.filter(update)) {
                             continue;
-                        case ProcessResult.MESSAGE:
-                            SendMessage request = (SendMessage)result.getContent();
-                            if (request != null) {
-                                bot.execute(request, new Callback<SendMessage, SendResponse>() {
-                                    @Override
-                                    public void onResponse(SendMessage request, SendResponse response) {
-                                    }
-                                    @Override
-                                    public void onFailure(SendMessage request, IOException e) {
-                                    }
-                                });
+                        }
+
+                        ProcessResult result = updatesProcessor.process(update);
+
+                        switch (result.getResultType()) {
+                            case ProcessResult.NOOP:
+                                continue;
+                            case ProcessResult.MESSAGE:
+                                SendMessage request = (SendMessage) result.getContent();
+                                if (request != null) {
+                                    bot.execute(request, new Callback<SendMessage, SendResponse>() {
+                                        @Override
+                                        public void onResponse(SendMessage request, SendResponse response) {
+                                        }
+
+                                        @Override
+                                        public void onFailure(SendMessage request, IOException e) {
+                                        }
+                                    });
+                                }
+                                break;
+                            case ProcessResult.ANSWER_CALLBACK_QUERY:
+                                AnswerCallbackQuery answerCallbackQuery = (AnswerCallbackQuery) result.getContent();
+                                if (answerCallbackQuery != null) {
+                                    bot.execute(answerCallbackQuery);
+                                }
+                                break;
+                        }
+                    }
+                    catch(Exception ex) {
+                        ProcessResult result = new ProcessResult(ProcessResult.MESSAGE,
+                                new SendMessage(update.message().chat().id(), StringConstants.SOMETHINGS_GONE_WRONG)
+                        );
+                        SendMessage request = (SendMessage) result.getContent();
+                        bot.execute(request, new Callback<SendMessage, SendResponse>() {
+                            @Override
+                            public void onResponse(SendMessage request, SendResponse response) {
                             }
-                            break;
-                        case ProcessResult.ANSWER_CALLBACK_QUERY:
-                            AnswerCallbackQuery answerCallbackQuery = (AnswerCallbackQuery) result.getContent();
-                            if(answerCallbackQuery != null) {
-                                bot.execute(answerCallbackQuery);
+
+                            @Override
+                            public void onFailure(SendMessage request, IOException e) {
                             }
-                            break;
+                        });
                     }
                 }
                 return UpdatesListener.CONFIRMED_UPDATES_ALL;
